@@ -85,7 +85,7 @@ class ForwardKinematicsNode(object):
 
         # Compute linear and angular velocity of the platform
         v = (self.radius * omega_r + self.radius * omega_l) / 2.0
-        omega = (self.radius * omega_r - self.radius * omega_l) / self.baseline
+        omega = (self.radius * omega_r - self.radius * omega_l) / (self.baseline*2) 
 
         # Stuff the v and omega into a message and publish
         msg_velocity = Twist2DStamped()
