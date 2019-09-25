@@ -13,6 +13,8 @@ class JoyMapperNode(DTROS):
     The `JoyMapperNode` receives :obj:`Joy` messages from a phisical joystick or a virtual one,
     interprets the buttons presses and acts accordingly.
 
+    TODO: Add emergency stop back
+
     **Joystick bindings:**
 
     +----------------------+------------------+------------------------------------------------+
@@ -49,9 +51,6 @@ class JoyMapperNode(DTROS):
         # Initialize the DTROS parent class
         super(JoyMapperNode, self).__init__(node_name=node_name)
 
-        self.last_pub_msg = None
-        self.last_pub_time = rospy.Time.now()
-
         # Add the node parameters to the parameters dictionary
         self.parameters['~speed_gain'] = None
         self.parameters['~steer_gain'] = None
@@ -65,7 +64,7 @@ class JoyMapperNode(DTROS):
 
         # Subscription to the joystick command
         # TODO: No ~ for this topic?
-        self.sub_joy_ = self.subscriber("joy", Joy, self.cbJoy, queue_size=1)
+        self.sub_joy = self.subscriber("joy", Joy, self.cbJoy, queue_size=1)
 
         # Button List index of joy.buttons array:
         # 0: A
@@ -94,7 +93,7 @@ class JoyMapperNode(DTROS):
 
         # Navigation buttons
         car_cmd_msg = Twist2DStamped()
-        car_cmd_msg.header.stamp = joy_msg.header.stamp
+        car_cmd_msg.header.stamp = rospy.get_rostime()
         car_cmd_msg.v = joy_msg.axes[1] * self.parameters['~speed_gain']  # Left stick V-axis. Up is positive
         if self.parameters['~bicycle_kinematics']:
             # Implements Bicycle Kinematics - Nonholonomic Kinematics
@@ -113,7 +112,7 @@ class JoyMapperNode(DTROS):
             override_msg.data = True
             self.log('override_msg = True')
             self.pub_joy_override.publish(override_msg)
-
+            
         # Start button: Start LF
         elif (joy_msg.buttons[7] == 1):
             override_msg = BoolStamped()
