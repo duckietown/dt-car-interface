@@ -57,4 +57,4 @@ LABEL org.duckietown.label.base.image "${BASE_IMAGE}:${BASE_TAG}"
 # <==================================================
 
 # maintainer
-LABEL maintainer="Liam Paull (<YOUR_EMAIL_ADDRESS>)"
+LABEL maintainer="Liam Paull (<YOUR_EMAIL_ADDRESS>)" #template-ignore
