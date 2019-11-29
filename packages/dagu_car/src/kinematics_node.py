@@ -4,6 +4,7 @@ import rospy
 import yaml
 import time
 import os.path
+import numpy as np
 
 from duckietown import DTROS
 from duckietown_msgs.msg import WheelsCmdStamped, Twist2DStamped
@@ -36,7 +37,7 @@ class KinematicsNode(DTROS):
         ~trim (:obj:`float`): trimming factor that is typically used to offset differences in the
             behaviour of the left and right motors, it is recommended to use a value that results in
             the robot moving in a straight line when forward command is given, default is 0.0
-        ~baseline (:obj:`float`): the distance between the two wheels of the robot, default is 0.1
+        ~wheel_distance (:obj:`float`): the distance between the two wheels of the robot, default is 0.1
         ~radius (:obj:`float`): radius of the wheel, default is 0.0318
         ~k (:obj:`float`): motor constant, assumed equal for both motors, default is 27.0
         ~limit (:obj:`float`): limits the final commands sent to the motors, default is 1.0
@@ -67,12 +68,14 @@ class KinematicsNode(DTROS):
         # Add the node parameters to the parameters dictionary and load their default values
         self.parameters['~gain'] = None
         self.parameters['~trim'] = None
-        self.parameters['~baseline'] = None
+        self.parameters['~wheel_distance'] = None
         self.parameters['~radius'] = None
         self.parameters['~k'] = None
         self.parameters['~limit'] = None
         self.parameters['~v_max'] = None
         self.parameters['~omega_max'] = None
+        self.parameters['~turning_rad_lim'] = None
+        self.parameters['~min_turn_rad'] = None
 
         # Set parameters using a robot-specific yaml file if such exists
         self.readParamFromFile()
@@ -86,8 +89,8 @@ class KinematicsNode(DTROS):
         self.pub_wheels_cmd = self.publisher("~wheels_cmd", WheelsCmdStamped, queue_size=1)
         self.pub_velocity = self.publisher("~velocity", Twist2DStamped, queue_size=1)
 
-        details = "[gain: %s trim: %s baseline: %s radius: %s k: %s limit: %s omega_max: %s v_max: %s]" % \
-                  (self.parameters['~gain'], self.parameters['~trim'], self.parameters['~baseline'],
+        details = "[gain: %s trim: %s wheel_distance: %s radius: %s k: %s limit: %s omega_max: %s v_max: %s]" % \
+                  (self.parameters['~gain'], self.parameters['~trim'], self.parameters['~wheel_distance'],
                    self.parameters['~radius'], self.parameters['~k'], self.parameters['~limit'],
                    self.parameters['~omega_max'], self.parameters['~v_max'])
 
@@ -118,7 +121,7 @@ class KinematicsNode(DTROS):
             if yaml_dict is None:
                 # Empty yaml file
                 return
-            for param_name in ["gain", "trim", "baseline", "k", "radius", "limit"]:
+            for param_name in ["gain", "trim", "wheel_distance", "k", "radius", "limit"]:
                 param_value = yaml_dict.get(param_name)
                 if param_name is not None:
                     rospy.set_param("~"+param_name, param_value)
@@ -161,7 +164,7 @@ class KinematicsNode(DTROS):
             "calibration_time": time.strftime("%Y-%m-%d-%H-%M-%S"),
             "gain": self.parameters['~gain'],
             "trim": self.parameters['~trim'],
-            "baseline": self.parameters['~baseline'],
+            "wheel_distance": self.parameters['~wheel_distance'],
             "radius": self.parameters['~radius'],
             "k": self.parameters['~k'],
             "limit": self.parameters['~limit'],
@@ -175,8 +178,8 @@ class KinematicsNode(DTROS):
             outfile.write(yaml.dump(data, default_flow_style=False))
 
         # Printout
-        saved_details = "[gain: %s trim: %s baseline: %s radius: %s k: %s limit: %s omega_max: %s v_max: %s]" % \
-        (self.parameters['~gain'], self.parameters['~trim'], self.parameters['~baseline'], self.parameters['~radius'],
+        saved_details = "[gain: %s trim: %s wheel_distance: %s radius: %s k: %s limit: %s omega_max: %s v_max: %s]" % \
+        (self.parameters['~gain'], self.parameters['~trim'], self.parameters['~wheel_distance'], self.parameters['~radius'],
          self.parameters['~k'], self.parameters['~limit'], self.parameters['~omega_max'], self.parameters['~v_max'])
         self.log("Saved kinematic calibration to %s with values: %s" % (file_name, saved_details))
 
@@ -201,7 +204,7 @@ class KinematicsNode(DTROS):
             elif self.parameters['~limit'] > 1:
                 self.log("The new limit %s is larger than max of 1" % self.parameters['~limit'], type='warn')
 
-            for param in ['gain', 'baseline', 'radius', 'k', 'v_max', 'omega_max']:
+            for param in ['gain', 'wheel_distance', 'radius', 'k', 'v_max', 'omega_max']:
                 if self.parameters['~'+param] < 0:
                     self.log("The new value of %s is negative, should be positive." % param, type='warn')
             self.parametersChanged = False
@@ -222,8 +225,8 @@ class KinematicsNode(DTROS):
         k_r_inv = (self.parameters['~gain'] + self.parameters['~trim']) / k_r
         k_l_inv = (self.parameters['~gain'] - self.parameters['~trim']) / k_l
 
-        omega_r = (msg_car_cmd.v + 0.5 * msg_car_cmd.omega * self.parameters['~baseline']) / self.parameters['~radius']
-        omega_l = (msg_car_cmd.v - 0.5 * msg_car_cmd.omega * self.parameters['~baseline']) / self.parameters['~radius']
+        omega_r = (msg_car_cmd.v + 0.5 * msg_car_cmd.omega * self.parameters['~wheel_distance']) / self.parameters['~radius']
+        omega_l = (msg_car_cmd.v - 0.5 * msg_car_cmd.omega * self.parameters['~wheel_distance']) / self.parameters['~radius']
 
         # conversion from motor rotation rate to duty cycle
         # u_r = (gain + trim) (v + 0.5 * omega * b) / (r * k_r)
@@ -231,7 +234,7 @@ class KinematicsNode(DTROS):
         # u_l = (gain - trim) (v - 0.5 * omega * b) / (r * k_l)
         u_l = omega_l * k_l_inv
 
-        # limiting output to limit, which is 1.0 for the duckiebot
+        # limiting output to limit, which is 1.0 for the Duckiebot
         u_r_limited = self.trim(u_r, -self.parameters['~limit'], self.parameters['~limit'])
         u_l_limited = self.trim(u_l, -self.parameters['~limit'], self.parameters['~limit'])
 
@@ -240,6 +243,11 @@ class KinematicsNode(DTROS):
         msg_wheels_cmd.header.stamp = msg_car_cmd.header.stamp
         msg_wheels_cmd.vel_right = u_r_limited
         msg_wheels_cmd.vel_left = u_l_limited
+
+        # Limit the turning radius of the Duckiebot
+        if self.parameters['turning_rad_lim'] and msg_wheels_cmd.vel_left or msg_wheels_cmd.vel_right:
+            self.check_and_adjust_radius(msg_wheels_cmd)
+
         self.pub_wheels_cmd.publish(msg_wheels_cmd)
 
         # FORWARD KINEMATICS PART
@@ -251,7 +259,7 @@ class KinematicsNode(DTROS):
         # Compute linear and angular velocity of the platform
         v = (self.parameters['~radius'] * omega_r + self.parameters['~radius'] * omega_l) / 2.0
         omega = (self.parameters['~radius'] * omega_r - self.parameters['~radius'] * omega_l) / \
-                self.parameters['~baseline']
+                 self.parameters['~wheel_distance']
 
         # Put the v and omega into a velocity message and publish
         msg_velocity = Twist2DStamped()
@@ -274,6 +282,59 @@ class KinematicsNode(DTROS):
         """
 
         return max(min(value, high), low)
+
+    def check_and_adjust_radius(self, msg):
+        """
+        Checks if the current commands would generate a too small turning radius. If so it changes them.
+
+        Args:
+            msg: the current wheels command message
+
+        Returns:
+            did_adjustement: whether or not and adjustment has been performed
+        """
+        did_adjustment = False
+        # if both motor cmds do not have the same sign, we're demanding for an on-point turn (not allowed)
+        if np.sign(msg.vel_left) != np.sign(msg.vel_right):
+
+            # Simply set the smaller velocity to zero
+            if abs(msg.vel_left) < abs(msg.vel_right):
+                msg.vel_left = 0.0
+            else:
+                msg.vel_right = 0.0
+
+            did_adjustment = True
+
+        # set v1, v2 from msg velocities such that v2 > v1
+        if abs(msg.vel_right) > abs(msg.vel_left):
+            v1 = msg.vel_left
+            v2 = msg.vel_right
+        else:
+            v1 = msg.vel_right
+            v2 = msg.vel_left
+
+        # Check if a smaller radius than allowed is demanded
+        max_ratio = (self.parameters['min_turn_rad'] + self.parameters['wheel_distance']/2.0) \
+            / (self.parameters['min_turn_rad'] - self.parameters['wheel_distance']/2.0)
+
+        if v1 == 0 or abs(v2 / v1) > max_ratio:
+
+            # adjust velocities evenly such that condition is fulfilled
+            delta_v = (v2-v1)/2 - self.parameters['wheel_distance']/(4*self.parameters['min_turn_rad'])*(v1+v2)
+            v1 += delta_v
+            v2 -= delta_v
+            did_adjustment = True
+
+        # set msg velocities from v1, v2 with the same mapping as when we set v1, v2
+        if abs(msg.vel_right) > abs(msg.vel_left):
+            msg.vel_left = v1
+            msg.vel_right = v2
+        else:
+            msg.vel_left = v2
+            msg.vel_right = v1
+
+        return did_adjustment
+
 
 if __name__ == '__main__':
     # Initialize the node
