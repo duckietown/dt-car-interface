@@ -38,7 +38,6 @@ mappings: #Mapping from FSMStates.state to cmd source names. Allows different FS
   LOCALIZATION: "stop"
   DEEP_LANE_FOLLOWING: "deep_learning"
   PARKING: "parking"
-  ARRIVE_AT_STOP_LINE: "stop"
   INTERSECTION_PLANNING: "stop"
   CALIBRATING: "calib"
   CALIBRATING_CALC: "calib_calc"

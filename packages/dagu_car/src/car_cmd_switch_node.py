@@ -2,8 +2,10 @@
 
 import rospy
 
-from duckietown import DTROS
 from duckietown_msgs.msg import Twist2DStamped, FSMState
+
+from duckietown.dtros import DTROS, NodeType, TopicType
+
 
 class CarCmdSwitchNode(DTROS):
     """
@@ -12,7 +14,7 @@ class CarCmdSwitchNode(DTROS):
         This node will probably be redesigned soon.
 
     Subscriber:
-        ~mode"(:obj:`duckietown_msgs/FSMState`): Current control mode of the duckiebot
+        ~mode (:obj:`duckietown_msgs/FSMState`): Current control mode of the duckiebot
 
     Publisher:
         ~cmd (:obj`duckietown_msgs/Twist2DStamped`): The car command messages corresponding
@@ -21,45 +23,73 @@ class CarCmdSwitchNode(DTROS):
     def __init__(self, node_name):
 
         # Initialize the DTROS parent class
-        super(CarCmdSwitchNode, self).__init__(node_name=node_name)
+        super(CarCmdSwitchNode, self).__init__(
+            node_name=node_name,
+            node_type=NodeType.CONTROL
+        )
 
         # Read parameters
-        self.mappings = rospy.get_param("~mappings")
-        source_topic_dict = rospy.get_param("~source_topics")
+        self._mappings = rospy.get_param("~mappings")
+        self._source_topic = rospy.get_param("~source_topics")
+        self._mode_topic = rospy.get_param("~mode_topic")
         self.current_src_name = "joystick"
 
         # Construct publisher
-        self.pub_cmd = self.publisher("~cmd",Twist2DStamped,queue_size=1)
+        self.pub_cmd = rospy.Publisher(
+            "~cmd",
+            Twist2DStamped,
+            queue_size=1,
+            dt_topic_type=TopicType.CONTROL
+        )
 
         # Construct subscribers
-        self.sub_fsm_state = self.subscriber(rospy.get_param("~mode_topic"),FSMState,self.cbFSMState)
+        self.sub_fsm_state = rospy.Subscriber(
+            self._mode_topic,
+            FSMState,
+            self.fsm_state_cb
+        )
 
         self.sub_dict = dict()
-        for src_name, topic_name in source_topic_dict.items():
-            self.sub_dict[src_name] = self.subscriber(topic_name,Twist2DStamped,self.cbWheelsCmd,callback_args=src_name)
+        for src_name, topic_name in self._source_topic.items():
+            self.sub_dict[src_name] = rospy.Subscriber(
+                topic_name,
+                Twist2DStamped,
+                self.wheels_cmd_cb,
+                callback_args=src_name
+            )
+        # ---
+        self.log("Initialized.")
+        self.log(
+            "Sources:" +
+            '\n\t- '.join([''] + [
+                "'%s': '%s'" % (k, v) for k, v in self._source_topic.items()
+            ])
+        )
 
-        self.log("Initialized. ")
-        self.log("Sources: %s"%str(source_topic_dict))
-
-    def cbFSMState(self,fsm_state_msg):
-        self.current_src_name = self.mappings.get(fsm_state_msg.state)
+    def fsm_state_cb(self,fsm_state_msg):
+        self.current_src_name = self._mappings.get(fsm_state_msg.state)
         if self.current_src_name == "stop":
-            self.pubStop()
-            self.log("Car cmd switched to STOP in state %s." %(fsm_state_msg.state))
+            self.publish_stop()
+            self.log("Car cmd switched to STOP in state %s." % fsm_state_msg.state)
         elif self.current_src_name is None:
-            self.log("FSMState %s not handled. No msg pass through the switch." %(fsm_state_msg.state), type='warn')
+            self.logwarn(
+                "FSMState %s not handled. No msg pass through the switch." % fsm_state_msg.state
+            )
         else:
-            self.log("Car cmd switched to %s in state %s." %(self.current_src_name,fsm_state_msg.state))
+            self.log("Car cmd switched to %s in state %s." % (
+                self.current_src_name, fsm_state_msg.state
+            ))
 
-    def cbWheelsCmd(self,msg,src_name):
+    def wheels_cmd_cb(self,msg,src_name):
         if src_name == self.current_src_name:
             self.pub_cmd.publish(msg)
 
-    def pubStop(self):
+    def publish_stop(self):
         msg = Twist2DStamped()
         msg.v = 0
         msg.omega = 0
         self.pub_cmd.publish(msg)
+
 
 if __name__ == '__main__':
     # Create the DaguCar object
