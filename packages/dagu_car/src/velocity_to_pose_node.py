@@ -3,8 +3,10 @@
 import numpy as np
 import rospy
 
-from duckietown import DTROS
 from duckietown_msgs.msg import Twist2DStamped, Pose2DStamped
+
+from duckietown.dtros import DTROS, NodeType, TopicType
+
 
 class VelocityToPoseNode(DTROS):
     """
@@ -22,9 +24,11 @@ class VelocityToPoseNode(DTROS):
 
     """
     def __init__(self, node_name):
-
         # Initialize the DTROS parent class
-        super(VelocityToPoseNode, self).__init__(node_name=node_name)
+        super(VelocityToPoseNode, self).__init__(
+            node_name=node_name,
+            node_type=NodeType.LOCALIZATION
+        )
 
         # Get the vehicle name
         self.veh_name = rospy.get_namespace().strip("/")
@@ -33,10 +37,23 @@ class VelocityToPoseNode(DTROS):
         self.last_pose = Pose2DStamped()
         self.last_theta_dot = 0
         self.last_v = 0
-        
-        # Setup the publisher and subscriber
-        self.sub_velocity = self.subscriber("~velocity", Twist2DStamped, self.velocity_callback, queue_size=1)
-        self.pub_pose = self.publisher("~pose", Pose2DStamped, queue_size=1)
+
+        # Setup the publisher
+        self.pub_pose = rospy.Publisher(
+            "~pose",
+            Pose2DStamped,
+            queue_size=1,
+            dt_topic_type=TopicType.LOCALIZATION
+        )
+
+        # Setup the subscriber
+        self.sub_velocity = rospy.Subscriber(
+            "~velocity",
+            Twist2DStamped,
+            self.velocity_callback,
+            queue_size=1
+        )
+        # ---
         self.log("Initialized.")
 
     def velocity_callback(self, msg_velocity):

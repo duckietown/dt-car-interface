@@ -1,11 +1,12 @@
 #!/usr/bin/env python
+
 import rospy
 import math
 
-from duckietown import DTROS
-
 from duckietown_msgs.msg import Twist2DStamped, BoolStamped
 from sensor_msgs.msg import Joy
+
+from duckietown.dtros import DTROS, NodeType, TopicType
 
 
 # Button List index of joy.buttons array:
@@ -64,30 +65,55 @@ class JoyMapperNode(DTROS):
     """
     def __init__(self, node_name):
         # Initialize the DTROS parent class
-        super(JoyMapperNode, self).__init__(node_name=node_name)
+        super(JoyMapperNode, self).__init__(
+            node_name=node_name,
+            node_type=NodeType.CONTROL
+        )
 
         # emergency stop disabled by default
         self.e_stop = False
 
         # Add the node parameters to the parameters dictionary
-        self.parameters['~speed_gain'] = None
-        self.parameters['~steer_gain'] = None
-        self.parameters['~bicycle_kinematics'] = None
-        self.parameters['~simulated_vehicle_length'] = None
-        self.updateParameters()
+        self._speed_gain = rospy.get_param('~speed_gain')
+        self._steer_gain = rospy.get_param('~steer_gain')
+        self._bicycle_kinematics = rospy.get_param('~bicycle_kinematics')
+        self._simulated_vehicle_length = rospy.get_param('~simulated_vehicle_length')
 
         # Publications
-        self.pub_car_cmd = self.publisher("~car_cmd", Twist2DStamped, queue_size=1)
-        self.pub_joy_override = self.publisher("~joystick_override", BoolStamped, queue_size=1)
-        self.pub_e_stop = self.publisher("~emergency_stop", BoolStamped, queue_size=1)
-
-        # Subscription to the joystick command
-        self.sub_joy = self.subscriber("~joy", Joy, self.cbJoy, queue_size=1)
-        self.sub_e_stop = self.subscriber(
-            "~emergency_stop", BoolStamped, self.cbEStop, queue_size=1
+        self.pub_car_cmd = rospy.Publisher(
+            "~car_cmd",
+            Twist2DStamped,
+            queue_size=1,
+            dt_topic_type=TopicType.CONTROL
+        )
+        self.pub_joy_override = rospy.Publisher(
+            "~joystick_override",
+            BoolStamped,
+            queue_size=1,
+            dt_topic_type=TopicType.CONTROL
+        )
+        self.pub_e_stop = rospy.Publisher(
+            "~emergency_stop",
+            BoolStamped,
+            queue_size=1,
+            dt_topic_type=TopicType.CONTROL
         )
 
-    def cbEStop(self, estop_msg):
+        # Subscription to the joystick command
+        self.sub_joy = rospy.Subscriber(
+            "~joy",
+            Joy,
+            self.joy_cb,
+            queue_size=1
+        )
+        self.sub_e_stop = rospy.Subscriber(
+            "~emergency_stop",
+            BoolStamped,
+            self.estop_cb,
+            queue_size=1
+        )
+
+    def estop_cb(self, estop_msg):
         """
         Callback that process the received :obj:`BoolStamped` messages.
 
@@ -96,7 +122,7 @@ class JoyMapperNode(DTROS):
         """
         self.e_stop = estop_msg.data
 
-    def cbJoy(self, joy_msg):
+    def joy_cb(self, joy_msg):
         """
         Callback that process the received :obj:`Joy` messages.
 
@@ -106,17 +132,18 @@ class JoyMapperNode(DTROS):
         # Navigation buttons
         car_cmd_msg = Twist2DStamped()
         car_cmd_msg.header.stamp = rospy.get_rostime()
-        car_cmd_msg.v = joy_msg.axes[1] * self.parameters['~speed_gain']  # Left stick V-axis. Up is positive
-        if self.parameters['~bicycle_kinematics']:
+        # Left stick V-axis. Up is positive
+        car_cmd_msg.v = joy_msg.axes[1] * self._speed_gain
+        if self._bicycle_kinematics:
             # Implements Bicycle Kinematics - Nonholonomic Kinematics
             # see https://inst.eecs.berkeley.edu/~ee192/sp13/pdf/steer-control.pdf
-            steering_angle = joy_msg.axes[3] * self.parameters['~steer_gain']
+            steering_angle = joy_msg.axes[3] * self._steer_gain
             car_cmd_msg.omega = \
-                car_cmd_msg.v / self.parameters['~simulated_vehicle_length'] * \
+                car_cmd_msg.v / self._simulated_vehicle_length * \
                 math.tan(steering_angle)
         else:
             # Holonomic Kinematics for Normal Driving
-            car_cmd_msg.omega = joy_msg.axes[3] * self.parameters['~steer_gain']
+            car_cmd_msg.omega = joy_msg.axes[3] * self._steer_gain
         self.pub_car_cmd.publish(car_cmd_msg)
 
         # Back button: Stop LF
@@ -146,7 +173,7 @@ class JoyMapperNode(DTROS):
         else:
             some_active = sum(joy_msg.buttons) > 0
             if some_active:
-                self.log('No binding for joy_msg.buttons = %s' % str(joy_msg.buttons))
+                self.logwarn('No binding for joy_msg.buttons = %s' % str(joy_msg.buttons))
 
 
 if __name__ == "__main__":
