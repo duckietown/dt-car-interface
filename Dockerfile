@@ -5,8 +5,7 @@ ARG MAINTAINER="Liam Paull (<YOUR_EMAIL_ADDRESS>)"
 # ==================================================>
 # ==> Do not change the code below this line
 ARG ARCH=arm32v7
-#TODO: fix this "daffy-new-deal" -> "daffy"
-ARG DISTRO=daffy-new-deal
+ARG DISTRO=daffy
 ARG BASE_TAG=${DISTRO}-${ARCH}
 ARG BASE_IMAGE=dt-ros-commons
 ARG LAUNCHER=default
