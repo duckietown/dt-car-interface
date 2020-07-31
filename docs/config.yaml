@@ -3,7 +3,7 @@ docs_config_version: v1
 # CONFIGURE THESE TO MATCH YOUR PROJECT:
 project: "dt-car-interface"
 copyright: "Duckietown"
-author: "Liam Paull"
+author: "Andrea F. Daniele (afdaniele@ttic.edu)"
 version: "daffy"
 custom_sections:  [
   "Configuration",
@@ -21,6 +21,10 @@ custom_sections:  [
   "outputs",
   "output"
 ]
+intersphinx_mapping:
+  python:
+    url: https://docs.python.org/2.7
+    inventories: ['objects.inv']
 
 # REFRAIN FROM CHANGING THESE SPHINX-SPECIFIC CONFIGURATION SETTINGS:
 autodoc_default_flags:
