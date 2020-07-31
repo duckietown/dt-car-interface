@@ -8,7 +8,7 @@ The `joy_mapper` package contains the `JoyMapperNode`. This node maps the standa
 
 JoyMapperNode
 -------------
-.. autoclass:: nodes.JoyMapperNode
+.. autoclass:: dt_car_interface.JoyMapperNode
 
 
 

@@ -8,17 +8,17 @@ The `dagu_car` package contains three core nodes that facilitate a Duckiebot's m
 CarCmdSwitchNode
 ----------------
 
-.. automodule:: nodes.car_cmd_switch_node
+.. automodule:: dt_car_interface.car_cmd_switch_node
 
 
 KinematicsNode
 --------------
 
-.. automodule:: nodes.kinematics_node
+.. automodule:: dt_car_interface.kinematics_node
 
 
 VelocityToPoseNode
 ------------------
 
-.. automodule:: nodes.velocity_to_pose_node
+.. automodule:: dt_car_interface.velocity_to_pose_node
 
