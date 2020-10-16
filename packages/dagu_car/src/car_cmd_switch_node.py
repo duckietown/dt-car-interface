@@ -33,6 +33,7 @@ class CarCmdSwitchNode(DTROS):
         self._source_topic = rospy.get_param("~source_topics")
         self._mode_topic = rospy.get_param("~mode_topic")
         self.current_src_name = "joystick"
+        self.last_cmd_time = rospy.Time.now()
 
         # Construct publisher
         self.pub_cmd = rospy.Publisher(
@@ -66,6 +67,17 @@ class CarCmdSwitchNode(DTROS):
             ])
         )
 
+        # If we are in joystick mode and
+        # - there is no joystick open
+        # OR
+        # - There is no button being pushed
+        # We will output zeros
+        r = rospy.Rate(10) # 10hz
+        while not rospy.is_shutdown():
+            if self.current_src_name == "joystick" and (self.last_cmd_time - rospy.Time.now() > rospy.Duration(secs=1/15)):
+                self.publish_stop
+                r.sleep()
+
     def fsm_state_cb(self,fsm_state_msg):
         self.current_src_name = self._mappings.get(fsm_state_msg.state)
         if self.current_src_name == "stop":
@@ -82,6 +94,7 @@ class CarCmdSwitchNode(DTROS):
 
     def wheels_cmd_cb(self,msg,src_name):
         if src_name == self.current_src_name:
+            self.last_cmd_time = rospy.Time.now()
             self.pub_cmd.publish(msg)
 
     def publish_stop(self):
