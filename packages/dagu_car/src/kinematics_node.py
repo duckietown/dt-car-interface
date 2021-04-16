@@ -187,7 +187,7 @@ class KinematicsNode(DTROS):
                 return
             for param_name in self.get_current_configuration().keys():
                 param_value = yaml_dict.get(param_name)
-                if param_name is not None:
+                if param_name is not None and param_value is not None:
                     rospy.set_param("~"+param_name, param_value)
                 else:
                     # Skip if not defined, use default value instead.
