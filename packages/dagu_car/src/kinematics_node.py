@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import rospy
+import json
 import yaml
 import time
 import os.path
@@ -142,19 +143,22 @@ class KinematicsNode(DTROS):
             self.car_cmd_callback
         )
         # ---
-        self.log("Initialized with: %s" % self._get_details_str())
+        self.log("Initialized with: \n%s" % self.get_configuration_as_str())
 
-    def _get_details_str(self):
-        return "[" \
-            "gain: %s; " % self._gain.value + \
-            "trim: %s; " % self._trim.value + \
-            "baseline: %s; " % self._baseline.value + \
-            "radius: %s; " % self._radius.value + \
-            "k: %s; " % self._k + \
-            "limit: %s; " % self._limit.value + \
-            "omega_max: %s; " % self._omega_max.value + \
-            "v_max: %s;" % self._v_max.value + \
-            "]"
+    def get_current_configuration(self):
+        return {
+            "gain": rospy.get_param('~gain'),
+            "trim": rospy.get_param('~trim'),
+            "baseline": rospy.get_param('~baseline'),
+            "radius": rospy.get_param('~radius'),
+            "k": rospy.get_param('~k'),
+            "limit": rospy.get_param('~limit'),
+            "v_max": rospy.get_param('~v_max'),
+            "omega_max": rospy.get_param('~omega_max'),
+        }
+
+    def get_configuration_as_str(self) -> str:
+        return json.dumps(self.get_current_configuration(), sort_keys=True, indent=4)
 
     def read_params_from_calibration_file(self):
         """
@@ -205,14 +209,7 @@ class KinematicsNode(DTROS):
         # Write to a yaml file
         data = {
             "calibration_time": time.strftime("%Y-%m-%d-%H-%M-%S"),
-            "gain": self._gain.value,
-            "trim": self._trim.value,
-            "baseline": self._baseline.value,
-            "radius": self._radius.value,
-            "k": self._k,
-            "limit": self._limit.value,
-            "v_max": self._v_max.value,
-            "omega_max": self._omega_max.value
+            **self.get_current_configuration()
         }
 
         # Write to file
@@ -221,8 +218,8 @@ class KinematicsNode(DTROS):
             outfile.write(yaml.dump(data, default_flow_style=False))
 
         # ---
-        self.log("Saved kinematic calibration to %s with values: %s" % (
-            file_name, self._get_details_str()
+        self.log("Saved kinematic calibration to %s with values: \n%s" % (
+            file_name, self.get_configuration_as_str()
         ))
 
         return EmptyResponse()
