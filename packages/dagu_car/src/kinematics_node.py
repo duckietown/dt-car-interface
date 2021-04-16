@@ -73,29 +73,49 @@ class KinematicsNode(DTROS):
         self.read_params_from_calibration_file()
 
         # Get static parameters
-        self._baseline = rospy.get_param('~baseline')
-        self._radius = rospy.get_param('~radius')
         self._k = rospy.get_param('~k')
-        self._v_max = rospy.get_param('~v_max')
-        self._omega_max = rospy.get_param('~omega_max')
         # Get editable parameters
         self._gain = DTParam(
             '~gain',
             param_type=ParamType.FLOAT,
-            min_value=0.0,
+            min_value=0.1,
             max_value=1.0
         )
         self._trim = DTParam(
             '~trim',
             param_type=ParamType.FLOAT,
-            min_value=0.0,
+            min_value=0.1,
             max_value=1.0
         )
         self._limit = DTParam(
             '~limit',
             param_type=ParamType.FLOAT,
-            min_value=0.0,
+            min_value=0.1,
             max_value=1.0
+        )
+        self._baseline = DTParam(
+            '~baseline',
+            param_type=ParamType.FLOAT,
+            min_value=0.05,
+            max_value=0.2
+        )
+        self._radius = DTParam(
+            '~radius',
+            param_type=ParamType.FLOAT,
+            min_value=0.01,
+            max_value=0.1
+        )
+        self._v_max = DTParam(
+            '~v_max',
+            param_type=ParamType.FLOAT,
+            min_value=0.01,
+            max_value=2.0
+        )
+        self._omega_max = DTParam(
+            '~omega_max',
+            param_type=ParamType.FLOAT,
+            min_value=1.0,
+            max_value=10.0
         )
 
         # Prepare the save calibration service
@@ -128,12 +148,12 @@ class KinematicsNode(DTROS):
         return "[" \
             "gain: %s; " % self._gain.value + \
             "trim: %s; " % self._trim.value + \
-            "baseline: %s; " % self._baseline + \
-            "radius: %s; " % self._radius + \
+            "baseline: %s; " % self._baseline.value + \
+            "radius: %s; " % self._radius.value + \
             "k: %s; " % self._k + \
             "limit: %s; " % self._limit.value + \
-            "omega_max: %s; " % self._omega_max + \
-            "v_max: %s;" % self._v_max + \
+            "omega_max: %s; " % self._omega_max.value + \
+            "v_max: %s;" % self._v_max.value + \
             "]"
 
     def read_params_from_calibration_file(self):
@@ -187,12 +207,12 @@ class KinematicsNode(DTROS):
             "calibration_time": time.strftime("%Y-%m-%d-%H-%M-%S"),
             "gain": self._gain.value,
             "trim": self._trim.value,
-            "baseline": self._baseline,
-            "radius": self._radius,
+            "baseline": self._baseline.value,
+            "radius": self._radius.value,
             "k": self._k,
             "limit": self._limit.value,
-            "v_max": self._v_max,
-            "omega_max": self._omega_max
+            "v_max": self._v_max.value,
+            "omega_max": self._omega_max.value
         }
 
         # Write to file
@@ -224,25 +244,24 @@ class KinematicsNode(DTROS):
         # trim the desired commands such that they are within the limits:
         msg_car_cmd.v = self.trim(
             msg_car_cmd.v,
-            low=-self._v_max,
-            high=self._v_max
+            low=-self._v_max.value,
+            high=self._v_max.value
         )
         msg_car_cmd.omega = self.trim(
             msg_car_cmd.omega,
-            low=-self._omega_max,
-            high=self._omega_max
+            low=-self._omega_max.value,
+            high=self._omega_max.value
         )
 
         # assuming same motor constants k for both motors
-        k_r = self._k
-        k_l = self._k
+        k_r = k_l = self._k
 
         # adjusting k by gain and trim
         k_r_inv = (self._gain.value + self._trim.value) / k_r
         k_l_inv = (self._gain.value - self._trim.value) / k_l
 
-        omega_r = (msg_car_cmd.v + 0.5 * msg_car_cmd.omega * self._baseline) / self._radius
-        omega_l = (msg_car_cmd.v - 0.5 * msg_car_cmd.omega * self._baseline) / self._radius
+        omega_r = (msg_car_cmd.v + 0.5 * msg_car_cmd.omega * self._baseline.value) / self._radius.value
+        omega_l = (msg_car_cmd.v - 0.5 * msg_car_cmd.omega * self._baseline.value) / self._radius.value
 
         # conversion from motor rotation rate to duty cycle
         # u_r = (gain + trim) (v + 0.5 * omega * b) / (r * k_r)
@@ -268,8 +287,8 @@ class KinematicsNode(DTROS):
         omega_l = msg_wheels_cmd.vel_left / k_l_inv
 
         # Compute linear and angular velocity of the platform
-        v = (self._radius * omega_r + self._radius * omega_l) / 2.0
-        omega = (self._radius * omega_r - self._radius * omega_l) / self._baseline
+        v = (self._radius.value * omega_r + self._radius.value * omega_l) / 2.0
+        omega = (self._radius.value * omega_r - self._radius.value * omega_l) / self._baseline.value
 
         # Put the v and omega into a velocity message and publish
         msg_velocity = Twist2DStamped()
