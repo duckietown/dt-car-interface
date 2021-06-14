@@ -59,13 +59,11 @@ class KinematicsNode(DTROS):
                 to `/data/config/calibrations/kinematics/HOSTNAME.yaml`.
 
     """
+
     def __init__(self, node_name):
 
         # Initialize the DTROS parent class
-        super(KinematicsNode, self).__init__(
-            node_name=node_name,
-            node_type=NodeType.CONTROL
-        )
+        super(KinematicsNode, self).__init__(node_name=node_name, node_type=NodeType.CONTROL)
 
         # Get the vehicle name
         self.veh_name = rospy.get_namespace().strip("/")
@@ -74,87 +72,42 @@ class KinematicsNode(DTROS):
         self.read_params_from_calibration_file()
 
         # Get static parameters
-        self._k = rospy.get_param('~k')
+        self._k = rospy.get_param("~k")
         # Get editable parameters
-        self._gain = DTParam(
-            '~gain',
-            param_type=ParamType.FLOAT,
-            min_value=0.1,
-            max_value=1.0
-        )
-        self._trim = DTParam(
-            '~trim',
-            param_type=ParamType.FLOAT,
-            min_value=0.1,
-            max_value=1.0
-        )
-        self._limit = DTParam(
-            '~limit',
-            param_type=ParamType.FLOAT,
-            min_value=0.1,
-            max_value=1.0
-        )
-        self._baseline = DTParam(
-            '~baseline',
-            param_type=ParamType.FLOAT,
-            min_value=0.05,
-            max_value=0.2
-        )
-        self._radius = DTParam(
-            '~radius',
-            param_type=ParamType.FLOAT,
-            min_value=0.01,
-            max_value=0.1
-        )
-        self._v_max = DTParam(
-            '~v_max',
-            param_type=ParamType.FLOAT,
-            min_value=0.01,
-            max_value=2.0
-        )
-        self._omega_max = DTParam(
-            '~omega_max',
-            param_type=ParamType.FLOAT,
-            min_value=1.0,
-            max_value=10.0
-        )
+        self._gain = DTParam("~gain", param_type=ParamType.FLOAT, min_value=0.1, max_value=1.0)
+        self._trim = DTParam("~trim", param_type=ParamType.FLOAT, min_value=0.1, max_value=1.0)
+        self._limit = DTParam("~limit", param_type=ParamType.FLOAT, min_value=0.1, max_value=1.0)
+        self._baseline = DTParam("~baseline", param_type=ParamType.FLOAT, min_value=0.05, max_value=0.2)
+        self._radius = DTParam("~radius", param_type=ParamType.FLOAT, min_value=0.01, max_value=0.1)
+        self._v_max = DTParam("~v_max", param_type=ParamType.FLOAT, min_value=0.01, max_value=2.0)
+        self._omega_max = DTParam("~omega_max", param_type=ParamType.FLOAT, min_value=1.0, max_value=10.0)
 
         # Prepare the save calibration service
         self.srv_save = rospy.Service("~save_calibration", Empty, self.srv_save_calibration)
 
         # Setup publishers
         self.pub_wheels_cmd = rospy.Publisher(
-            "~wheels_cmd",
-            WheelsCmdStamped,
-            queue_size=1,
-            dt_topic_type=TopicType.CONTROL
+            "~wheels_cmd", WheelsCmdStamped, queue_size=1, dt_topic_type=TopicType.CONTROL
         )
         self.pub_velocity = rospy.Publisher(
-            "~velocity",
-            Twist2DStamped,
-            queue_size=1,
-            dt_topic_type=TopicType.CONTROL
+            "~velocity", Twist2DStamped, queue_size=1, dt_topic_type=TopicType.CONTROL
         )
 
         # Setup subscribers
-        self.sub_car_cmd = rospy.Subscriber(
-            "~car_cmd",
-            Twist2DStamped,
-            self.car_cmd_callback
-        )
+        self.sub_car_cmd = rospy.Subscriber("~car_cmd", Twist2DStamped, self.car_cmd_callback)
         # ---
         self.log("Initialized with: \n%s" % self.get_configuration_as_str())
 
     def get_current_configuration(self):
         return {
-            "gain": rospy.get_param('~gain'),
-            "trim": rospy.get_param('~trim'),
-            "baseline": rospy.get_param('~baseline'),
-            "radius": rospy.get_param('~radius'),
-            "k": rospy.get_param('~k'),
-            "limit": rospy.get_param('~limit'),
-            "v_max": rospy.get_param('~v_max'),
-            "omega_max": rospy.get_param('~omega_max'),
+            "gain": rospy.get_param("~gain"),
+            "trim": rospy.get_param("~trim"),
+            "baseline": rospy.get_param("~baseline"),
+            "radius": rospy.get_param("~radius"),
+            "k": rospy.get_param("~k"),
+            "limit": rospy.get_param("~limit"),
+            "v_max": rospy.get_param("~v_max"),
+            "omega_max": rospy.get_param("~omega_max"),
         }
 
     def get_configuration_as_str(self) -> str:
@@ -173,9 +126,9 @@ class KinematicsNode(DTROS):
         if not os.path.isfile(fname):
             self.logwarn("Kinematics calibration %s not found! Using default instead." % fname)
         else:
-            with open(fname, 'r') as in_file:
+            with open(fname, "r") as in_file:
                 try:
-                    yaml_dict = yaml.load(in_file)
+                    yaml_dict = yaml.load(in_file, Loader=yaml.FullLoader)
                 except yaml.YAMLError as exc:
                     self.logfatal("YAML syntax error. File: %s fname. Exc: %s" % (fname, exc))
                     rospy.signal_shutdown()
@@ -188,7 +141,7 @@ class KinematicsNode(DTROS):
             for param_name in self.get_current_configuration().keys():
                 param_value = yaml_dict.get(param_name)
                 if param_name is not None and param_value is not None:
-                    rospy.set_param("~"+param_name, param_value)
+                    rospy.set_param("~" + param_name, param_value)
                 else:
                     # Skip if not defined, use default value instead.
                     pass
@@ -207,20 +160,18 @@ class KinematicsNode(DTROS):
         """
 
         # Write to a yaml file
-        data = {
-            "calibration_time": time.strftime("%Y-%m-%d-%H-%M-%S"),
-            **self.get_current_configuration()
-        }
+        data = {"calibration_time": time.strftime("%Y-%m-%d-%H-%M-%S"), **self.get_current_configuration()}
 
         # Write to file
         file_name = self.get_calibration_filepath(self.veh_name)
-        with open(file_name, 'w') as outfile:
+        with open(file_name, "w") as outfile:
             outfile.write(yaml.dump(data, default_flow_style=False))
 
         # ---
-        self.log("Saved kinematic calibration to %s with values: \n%s" % (
-            file_name, self.get_configuration_as_str()
-        ))
+        self.log(
+            "Saved kinematic calibration to %s with values: \n%s"
+            % (file_name, self.get_configuration_as_str())
+        )
 
         return EmptyResponse()
 
@@ -239,15 +190,9 @@ class KinematicsNode(DTROS):
         # INVERSE KINEMATICS PART
 
         # trim the desired commands such that they are within the limits:
-        msg_car_cmd.v = self.trim(
-            msg_car_cmd.v,
-            low=-self._v_max.value,
-            high=self._v_max.value
-        )
+        msg_car_cmd.v = self.trim(msg_car_cmd.v, low=-self._v_max.value, high=self._v_max.value)
         msg_car_cmd.omega = self.trim(
-            msg_car_cmd.omega,
-            low=-self._omega_max.value,
-            high=self._omega_max.value
+            msg_car_cmd.omega, low=-self._omega_max.value, high=self._omega_max.value
         )
 
         # assuming same motor constants k for both motors
@@ -322,13 +267,13 @@ class KinematicsNode(DTROS):
             :obj:`str`: the full path to the robot-specific calibration file
 
         """
-        cali_file_folder = '/data/config/calibrations/kinematics/'
+        cali_file_folder = "/data/config/calibrations/kinematics/"
         cali_file = cali_file_folder + name + ".yaml"
         return cali_file
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Initialize the node
-    kinematics_node = KinematicsNode(node_name='kinematics_node')
+    kinematics_node = KinematicsNode(node_name="kinematics_node")
     # Keep it spinning to keep the node alive
     rospy.spin()
