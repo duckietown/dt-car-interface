@@ -63,55 +63,34 @@ class JoyMapperNode(DTROS):
         ~joystick_override (:obj:`duckietown_msgs/BoolStamped`): Boolean that is used to control
            whether lane-following or joystick control is on
     """
+
     def __init__(self, node_name):
         # Initialize the DTROS parent class
-        super(JoyMapperNode, self).__init__(
-            node_name=node_name,
-            node_type=NodeType.CONTROL
-        )
+        super(JoyMapperNode, self).__init__(node_name=node_name, node_type=NodeType.CONTROL)
 
         # emergency stop disabled by default
         self.e_stop = False
 
         # Add the node parameters to the parameters dictionary
-        self._speed_gain = rospy.get_param('~speed_gain')
-        self._steer_gain = rospy.get_param('~steer_gain')
-        self._bicycle_kinematics = rospy.get_param('~bicycle_kinematics')
-        self._simulated_vehicle_length = rospy.get_param('~simulated_vehicle_length')
+        self._speed_gain = rospy.get_param("~speed_gain")
+        self._steer_gain = rospy.get_param("~steer_gain")
+        self._bicycle_kinematics = rospy.get_param("~bicycle_kinematics")
+        self._simulated_vehicle_length = rospy.get_param("~simulated_vehicle_length")
 
         # Publications
         self.pub_car_cmd = rospy.Publisher(
-            "~car_cmd",
-            Twist2DStamped,
-            queue_size=1,
-            dt_topic_type=TopicType.CONTROL
+            "~car_cmd", Twist2DStamped, queue_size=1, dt_topic_type=TopicType.CONTROL
         )
         self.pub_joy_override = rospy.Publisher(
-            "~joystick_override",
-            BoolStamped,
-            queue_size=1,
-            dt_topic_type=TopicType.CONTROL
+            "~joystick_override", BoolStamped, queue_size=1, dt_topic_type=TopicType.CONTROL
         )
         self.pub_e_stop = rospy.Publisher(
-            "~emergency_stop",
-            BoolStamped,
-            queue_size=1,
-            dt_topic_type=TopicType.CONTROL
+            "~emergency_stop", BoolStamped, queue_size=1, dt_topic_type=TopicType.CONTROL
         )
 
         # Subscription to the joystick command
-        self.sub_joy = rospy.Subscriber(
-            "~joy",
-            Joy,
-            self.joy_cb,
-            queue_size=1
-        )
-        self.sub_e_stop = rospy.Subscriber(
-            "~emergency_stop",
-            BoolStamped,
-            self.estop_cb,
-            queue_size=1
-        )
+        self.sub_joy = rospy.Subscriber("~joy", Joy, self.joy_cb, queue_size=1)
+        self.sub_e_stop = rospy.Subscriber("~emergency_stop", BoolStamped, self.estop_cb, queue_size=1)
 
     def estop_cb(self, estop_msg):
         """
@@ -138,9 +117,7 @@ class JoyMapperNode(DTROS):
             # Implements Bicycle Kinematics - Nonholonomic Kinematics
             # see https://inst.eecs.berkeley.edu/~ee192/sp13/pdf/steer-control.pdf
             steering_angle = joy_msg.axes[3] * self._steer_gain
-            car_cmd_msg.omega = \
-                car_cmd_msg.v / self._simulated_vehicle_length * \
-                math.tan(steering_angle)
+            car_cmd_msg.omega = car_cmd_msg.v / self._simulated_vehicle_length * math.tan(steering_angle)
         else:
             # Holonomic Kinematics for Normal Driving
             car_cmd_msg.omega = joy_msg.axes[3] * self._steer_gain
@@ -151,15 +128,15 @@ class JoyMapperNode(DTROS):
             override_msg = BoolStamped()
             override_msg.header.stamp = joy_msg.header.stamp
             override_msg.data = True
-            self.log('override_msg = True')
+            self.log("override_msg = True")
             self.pub_joy_override.publish(override_msg)
-            
+
         # Start button: Start LF
         elif joy_msg.buttons[7] == 1:
             override_msg = BoolStamped()
             override_msg.header.stamp = joy_msg.header.stamp
             override_msg.data = False
-            self.log('override_msg = False')
+            self.log("override_msg = False")
             self.pub_joy_override.publish(override_msg)
 
         # Y button: Emergency Stop
@@ -173,7 +150,7 @@ class JoyMapperNode(DTROS):
         else:
             some_active = sum(joy_msg.buttons) > 0
             if some_active:
-                self.logwarn('No binding for joy_msg.buttons = %s' % str(joy_msg.buttons))
+                self.logwarn("No binding for joy_msg.buttons = %s" % str(joy_msg.buttons))
 
 
 if __name__ == "__main__":

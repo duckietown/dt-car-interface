@@ -23,12 +23,10 @@ class VelocityToPoseNode(DTROS):
         ~pose (:obj:`Pose2DStamped`): The integrated pose relative to the pose of the robot at node initialization
 
     """
+
     def __init__(self, node_name):
         # Initialize the DTROS parent class
-        super(VelocityToPoseNode, self).__init__(
-            node_name=node_name,
-            node_type=NodeType.LOCALIZATION
-        )
+        super(VelocityToPoseNode, self).__init__(node_name=node_name, node_type=NodeType.LOCALIZATION)
 
         # Get the vehicle name
         self.veh_name = rospy.get_namespace().strip("/")
@@ -40,18 +38,12 @@ class VelocityToPoseNode(DTROS):
 
         # Setup the publisher
         self.pub_pose = rospy.Publisher(
-            "~pose",
-            Pose2DStamped,
-            queue_size=1,
-            dt_topic_type=TopicType.LOCALIZATION
+            "~pose", Pose2DStamped, queue_size=1, dt_topic_type=TopicType.LOCALIZATION
         )
 
         # Setup the subscriber
         self.sub_velocity = rospy.Subscriber(
-            "~velocity",
-            Twist2DStamped,
-            self.velocity_callback,
-            queue_size=1
+            "~velocity", Twist2DStamped, self.velocity_callback, queue_size=1
         )
         # ---
         self.log("Initialized.")
@@ -83,8 +75,16 @@ class VelocityToPoseNode(DTROS):
 
             # Add to the previous to get absolute pose relative to the starting position
             theta_res = self.last_pose.theta + theta_delta
-            x_res = self.last_pose.x + x_delta * np.cos(self.last_pose.theta) - y_delta * np.sin(self.last_pose.theta)
-            y_res = self.last_pose.y + y_delta * np.cos(self.last_pose.theta) + x_delta * np.sin(self.last_pose.theta)
+            x_res = (
+                self.last_pose.x
+                + x_delta * np.cos(self.last_pose.theta)
+                - y_delta * np.sin(self.last_pose.theta)
+            )
+            y_res = (
+                self.last_pose.y
+                + y_delta * np.cos(self.last_pose.theta)
+                + x_delta * np.sin(self.last_pose.theta)
+            )
 
             # Update the stored last pose
             self.last_pose.theta = theta_res
@@ -105,8 +105,8 @@ class VelocityToPoseNode(DTROS):
         self.last_v = msg_velocity.v
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     # Initialize the node
-    velocity_to_pose_node = VelocityToPoseNode(node_name='velocity_to_pose_node')
+    velocity_to_pose_node = VelocityToPoseNode(node_name="velocity_to_pose_node")
     # Keep it spinning to keep the node alive
     rospy.spin()
