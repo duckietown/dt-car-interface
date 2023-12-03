@@ -13,3 +13,4 @@ mappings: #Mapping from FSMStates.state to cmd source names. Allows different FS
   STOP_SIGN_INTERSECTION: "stop"
   TRAFFIC_LIGHT_INTERSECTION: "stop"
   INTERSECTION_CONTROL: "intersection"
+  STOP: "stop"
